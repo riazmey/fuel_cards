@@ -1,0 +1,3 @@
+id,name,is_currency,repr
+1,rub,True,Руб
+2,litre,False,Литр

@@ -1,0 +1,10 @@
+__pycache__/
+*.sqlite3
+.~lock.*
+**/migrations/**
+!**/migrations
+!**/migrations/__init__.py
+/venv/
+/env/
+/.idea/
+credent*.py
