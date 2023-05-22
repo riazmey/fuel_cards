@@ -1,5 +1,5 @@
 __pycache__/
-*.sqlite3
+*.sqlite3*
 .~lock.*
 **/migrations/**
 !**/migrations
@@ -8,3 +8,7 @@ __pycache__/
 /env/
 /.idea/
 credent*.py
+*-schedule*
+*redis*
+*127.0.0.1*
+!*example*

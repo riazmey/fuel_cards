@@ -1,9 +1,9 @@
 from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.signals import post_init
-from django.utils import timezone
 
 from .api import *
+from .common import progress_bar
 
 
 class EnumSiteType(models.Model):
@@ -172,7 +172,8 @@ class Contract(models.Model):
 
 
 class Site(models.Model):
-    type = models.ForeignKey(EnumSiteType, on_delete=models.PROTECT, db_index=True, blank=False, verbose_name='Тип сайта')
+    type = models.ForeignKey(EnumSiteType, on_delete=models.PROTECT, db_index=True, blank=False,
+                             verbose_name='Тип сайта')
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, db_index=True, blank=False,
                                      verbose_name='Организация')
     url = models.URLField(max_length=254, default='', blank=False, verbose_name='Адрес (URL)')
@@ -230,6 +231,7 @@ class SiteBalance(models.Model):
 
 class Card(models.Model):
     site = models.ForeignKey(Site, on_delete=models.PROTECT, db_index=True, blank=False, verbose_name='Сайт')
+    relevant = models.BooleanField(db_index=True, default=True, blank=False, verbose_name='Актуальна')
     number = models.CharField(max_length=40, db_index=True, default='', blank=False, verbose_name='Номер карты')
     status = models.ForeignKey(EnumCardStatus, on_delete=models.PROTECT, blank=False, verbose_name='Статус')
     repr = models.CharField(max_length=50, default='', blank=True, verbose_name='Топливная карта')
@@ -358,7 +360,7 @@ class TransactionItem(models.Model):
         if self.item:
             self.repr = f'{self.item.name} ({self.transaction})'
         else:
-            self.repr = f'<Товар пуст> ({self.transaction})'
+            self.repr = f'<Товар отсутствует> ({self.transaction})'
         super(TransactionItem, self).save(*args, **kwargs)
 
     def __str__(self):
@@ -400,10 +402,10 @@ class BaseAPI:
             self.contract_id = ''
 
     @transaction.atomic
-    def import_balance(self) -> dict:
+    def import_balance(self, **kwargs) -> (dict, bool):
         result = {'obj': None, 'created': False}
-        data, received = self.get_balance()
-        if received:
+        data, success = self.get_balance()
+        if success:
             date = data.get('date', '')
             balance = data.get('balance', 0.00)
             credit = data.get('credit', 0.00)
@@ -411,14 +413,17 @@ class BaseAPI:
                 defaults = {'balance': balance, 'credit': credit}
                 obj, created = SiteBalance.objects.update_or_create(site=self.site, date=date, defaults=defaults)
                 result = {'obj': obj, 'created': created}
-        return result
+        return result, success
 
     @transaction.atomic
-    def import_goods(self) -> list[dict]:
+    def import_goods(self, **kwargs) -> (list[dict], bool):
         result = []
-        data, received = self.get_list_goods()
-        if received:
-            for data_item in data:
+        verbose = kwargs.get('verbose', False)
+        data, success = self.get_list_goods()
+        if success:
+            total_items = len(data)
+            for i in range(total_items):
+                data_item = data[i]
                 id_external = data_item.get('id_external', '')
                 category = data_item.get('category', '')
                 name = data_item.get('name', '')
@@ -426,70 +431,119 @@ class BaseAPI:
                 defaults = {'category': category_obj, 'name': name}
                 obj, created = Item.objects.update_or_create(site=self.site, id_external=id_external, defaults=defaults)
                 result.append({'obj': obj, 'created': created})
-        return result
+                if verbose:
+                    counter = i + 1
+                    text_prefix = f'Товары ({self.site}) {counter}/{total_items}:'
+                    progress_bar(counter, total_items, prefix=text_prefix, length=50)
+        return result, success
 
     @transaction.atomic
-    def import_cards(self) -> list[dict]:
+    def import_cards(self, **kwargs) -> (list[dict], bool):
         result = []
-        data, received = self.get_list_cards()
-        if received:
-            for data_card in data:
+        list_cards = []
+        list_cards_obj = Card.objects.filter(site=self.site, relevant=True)
+        for card_obj in list_cards_obj:
+            list_cards.append(card_obj.number)
+        verbose = kwargs.get('verbose', False)
+        data, success = self.get_list_cards()
+        if success:
+            total_items = len(data)
+            for i in range(total_items):
+                data_card = data[i]
                 number = data_card.get('number', '')
                 status = data_card.get('status', '')
                 status_obj = EnumCardStatus.objects.get(name=status)
                 obj, created = Card.objects.update_or_create(site=self.site, number=number,
-                                                             defaults={'status': status_obj})
+                                                             defaults={'status': status_obj, 'relevant': True})
                 result.append({'obj': obj, 'created': created})
-        return result
+                if number in list_cards:
+                    list_cards.remove(number)
+                if verbose:
+                    counter = i + 1
+                    text_prefix = f'Карты ({self.site}) {counter}/{total_items}:'
+                    progress_bar(counter, total_items, prefix=text_prefix, length=50)
+            counter = 0
+            for number in list_cards:
+                Card.objects.update_or_create(site=self.site, number=number,
+                                              defaults={'relevant': False})
+                if verbose:
+                    counter += 1
+                    text_prefix = f'Дективация карт ({self.site}) {counter}/{total_items}:'
+                    progress_bar(counter, len(list_cards), prefix=text_prefix, length=50)
+        return result, success
 
     @transaction.atomic
-    def import_limits_by_card(self, card_number: str) -> list[dict]:
+    def import_limits_by_card(self, card_number: str) -> (list[dict], bool):
         result = []
         card_obj = self._get_card_obj(card_number)
         if not card_obj:
-            return result
-        data, received = self.get_list_limits_by_card(card_number)
-        if received:
+            return False, result
+        data, success = self.get_list_limits_by_card(card_number)
+        if success:
             result = self._import_limits_by_card(card_obj, data)
-        return result
+        return result, success
 
     @transaction.atomic
-    def import_limits(self) -> list[dict]:
+    def import_limits(self, **kwargs) -> (list[dict], bool):
         result = []
         list_cards = []
-        list_cards_obj = Card.objects.filter(site=self.site)
+        verbose = kwargs.get('verbose', False)
+        list_cards_obj = Card.objects.filter(site=self.site, relevant=True)
         for card_obj in list_cards_obj:
             list_cards.append(card_obj.number)
-        data, received = self.get_list_limits(list_cards)
-        if received:
-            for data_card_limits in data:
+        data, success = self.get_list_limits(list_cards)
+        if success:
+            total_items = 0
+            if verbose:
+                for data_card_limits in data:
+                    data_limits = data_card_limits.get('limits', [])
+                    total_items += len(data_limits)
+            for i in range(len(data)):
+                data_card_limits = data[i]
                 card_number = data_card_limits.get('card', '')
                 data_limits = data_card_limits.get('limits', [])
                 card_obj = self._get_card_obj(card_number)
                 if not card_obj:
                     continue
                 result += self._import_limits_by_card(card_obj, data_limits)
-        return result
+                if verbose:
+                    counter = i + 1
+                    text_prefix = f'Лимиты ({self.site}) {counter}/{total_items}:'
+                    progress_bar(counter, total_items, prefix=text_prefix, length=50)
+        else:
+            if verbose:
+                print('    !!!Не получилось получить данные об остатках лимитов. received = False')
+        return result, success
 
     @transaction.atomic
-    def import_transactions_by_card(self, card_number: str, begin: datetime, end: datetime) -> list[dict]:
+    def import_transactions_by_card(self, **kwargs) -> (list[dict], bool):
         result = []
-        params = {'card_number': card_number, 'begin': begin, 'end': end}
-        data, received = self.get_list_transactions(**params)
-        if received:
-            for data_transaction in data:
+        verbose = kwargs.get('verbose', False)
+        data, success = self.get_list_transactions(**kwargs)
+        if success:
+            total_items = len(data)
+            for i in range(total_items):
+                data_transaction = data[i]
                 result += self._import_transaction(data_transaction)
-        return result
+                if verbose:
+                    text_prefix = f'Транзакции ({self.site}) {i}/{total_items}:'
+                    progress_bar(i + 1, total_items, prefix=text_prefix, length=50)
+        return result, success
 
     @transaction.atomic
-    def import_transactions(self, begin: datetime, end: datetime) -> list[dict]:
+    def import_transactions(self, **kwargs) -> (list[dict], bool):
         result = []
-        params = {'begin': begin, 'end': end}
-        data, received = self.get_list_transactions(**params)
-        if received:
-            for data_transaction in data:
+        verbose = kwargs.get('verbose', False)
+        data, success = self.get_list_transactions(**kwargs)
+        if success:
+            total_items = len(data)
+            for i in range(total_items):
+                data_transaction = data[i]
                 result += self._import_transaction(data_transaction)
-        return result
+                if verbose:
+                    text_prefix = f'Транзакции ({self.site}) {i}/{total_items}:'
+                    progress_bar(i + 1, total_items, prefix=text_prefix, length=50)
+        return result, success
 
     def _import_transaction(self, data_transaction: dict) -> list[dict]:
         result = []
@@ -503,7 +557,7 @@ class BaseAPI:
         items = data_transaction.get('items', [])
 
         type_obj = EnumTransactionType.objects.get(name=type)
-        card_obj = self._get_card_obj(card)
+        card_obj = self._get_card_obj(card, True)
         defaults = {'type': type_obj, 'date': date, 'details': details, 'amount': amount, 'discount': discount}
 
         transaction_obj, created = Transaction.objects.update_or_create(card=card_obj, id_external=id_external,
@@ -534,7 +588,6 @@ class BaseAPI:
             obj, created = TransactionItem.objects.update_or_create(transaction=transaction_obj,
                                                                     item=item_obj, defaults=defaults)
             result.append({'obj': obj, 'created': created})
-
         return result
 
     def _import_limits_by_card(self, card_obj: Card, data_limits: list[dict]) -> list[dict]:
@@ -565,21 +618,21 @@ class BaseAPI:
                     item_obj = Item.objects.get(site=self.site, id_external=item)
 
             defaults = {'type': type_obj, 'category': category_obj, 'item': item_obj,
-                'unit': unit_obj, 'period': period_obj, 'value': value, 'balance': balance}
+                        'unit': unit_obj, 'period': period_obj, 'value': value, 'balance': balance}
 
             obj, created = Limit.objects.update_or_create(card=card_obj, id_external=id_external, defaults=defaults)
             result.append({'obj': obj, 'created': created})
 
         return result
 
-    def _get_card_obj(self, card_number: str) -> Card or None:
+    def _get_card_obj(self, card_number: str, relevant: bool = True) -> Card or None:
         if not card_number:
             return
         try:
             result = Card.objects.get(site=self.site, number=card_number)
         except Card.DoesNotExist:
             status_obj = EnumCardStatus.objects.get(name='block')
-            result = Card.objects.create(site=self.site, number=card_number, status=status_obj)
+            result = Card.objects.create(site=self.site, number=card_number, status=status_obj, relevant=relevant)
         return result
 
     def _get_item_obj(self, id_external: str) -> Item or None:

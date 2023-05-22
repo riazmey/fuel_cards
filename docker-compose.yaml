@@ -1,0 +1,57 @@
+version: '3.11'
+
+services:
+
+  redis:
+    container_name: kubis-fuel_redis
+    restart: always
+    image: redis:alpine
+
+  postgres:
+    container_name: kubis-fuel_postgres
+    restart: always
+    image: postgres
+    env_file:
+      - ./src/kubis_fuel/settings/pg_credential.py
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data/
+
+  django:
+    container_name: kubis-fuel_django
+    restart: always
+    build:
+      context: ./
+    ports:
+      - "8000:8000"
+    command: "python ./src/manage.py runserver 0.0.0.0:8000"
+    depends_on:
+      - redis
+      - postgres
+
+  celery-worker:
+    container_name: kubis-fuel_celery-worker
+    restart: always
+    build:
+      context: ./
+    environment:
+      - DEBUG=1
+    command: "celery --workdir=./src -A kubis_fuel worker -l info"
+    depends_on:
+      - redis
+      - django
+      - postgres
+
+  celery-beat:
+    container_name: kubis-fuel_celery-beat
+    restart: always
+    build:
+      context: ./
+    command: "celery --workdir=./src -A kubis_fuel beat --scheduler django_celery_beat.schedulers:DatabaseScheduler -l info"
+    environment:
+      - DEBUG=1
+    depends_on:
+      - redis
+      - django
+      - postgres

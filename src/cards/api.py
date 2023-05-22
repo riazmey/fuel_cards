@@ -91,7 +91,8 @@ class Rosneft:
     def get_list_limits(self, list_cards: list) -> (list[dict], bool):
         result = []
         threads = self._threads(list_cards)
-
+        total_threads = len(threads)
+        print(f'    !!!Enabled threads = {total_threads}')
         for index in range(len(threads)):
             threads[index]['thread'] = Thread(target=self._get_list_limits_by_thread, args=(threads, index))
             threads[index]['thread'].start()
@@ -105,8 +106,10 @@ class Rosneft:
             received = data_thread.get('received', False)
             data_response = data_thread.get('data_response', None)
             if received and isinstance(data_response, list):
+                print(f'        Thread {index}: true')
                 result += data_thread.get('data_response', [])
             else:
+                print(f'        Thread {index}: FALSE')
                 return result, False
 
         return result, True
@@ -383,7 +386,6 @@ class Rosneft:
             case 24:
                 result = 'return'
         return result
-
 
 class Tatneft:
     pass

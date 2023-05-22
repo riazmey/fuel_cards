@@ -40,8 +40,8 @@ class SiteBalanceAdmin(admin.ModelAdmin):
 
 
 class CardAdmin(admin.ModelAdmin):
-    fields = ['site', 'number', 'status']
-    list_display = ['site', 'number', 'status']
+    fields = ['site', 'number', 'relevant', 'status']
+    list_display = ['site', 'number', 'relevant', 'status']
     list_filter = ['site__repr']
     search_fields = ['number']
     ordering = ['site', 'number']
