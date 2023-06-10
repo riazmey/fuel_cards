@@ -22,14 +22,16 @@ class Rosneft:
         get_limits_by_card = '/api/emv/v1/GetCardLimits'
         get_list_cards = '/api/emv/v1/GetCardsByContract'
         get_list_transactions_by_card = '/api/emv/v2/GetOperByCard'
-        get_list_transactions = '/api/emv/v2/GetOperByContract'
-        set_limit_by_card = '/api/emv/v1/CreateCardLimit'
-        del_limit_by_card = '/api/emv/v1/EditCardLimit'
-        update_limit_by_card = '/api/emv/v1/DeleteCardLimit'
+        get_list_transactions_by_contract = '/api/emv/v2/GetOperByContract'
+        card_status_active = '/api/emv/v1/UnblockingCard'
+        card_status_block = '/api/emv/v1/BlockingCard'
+        limit_add = '/api/emv/v1/CreateCardLimit'
+        limit_update = '/api/emv/v1/EditCardLimit'
+        limit_delete = '/api/emv/v1/DeleteCardLimit'
 
     def get_balance(self) -> (dict, bool):
         result = {'date': '', 'balance': 0.0, 'credit': 0.0}
-        data, received = self._request_get(self.URNs.get_balance)
+        data, received = self._request(requests.get, self.URNs.get_balance)
         if received:
             result.update(date=timezone.now())
             result.update(balance=data.get('Balance', 0.00))
@@ -39,7 +41,7 @@ class Rosneft:
 
     def get_list_goods(self) -> (list[dict], bool):
         result = []
-        data, received = self._request_get(self.URNs.get_list_goods)
+        data, received = self._request(requests.get, self.URNs.get_list_goods)
         if received:
             for data_item in data:
                 result.append({
@@ -52,7 +54,7 @@ class Rosneft:
 
     def get_list_cards(self) -> (list[dict], bool):
         result = []
-        data, received = self._request_get(self.URNs.get_list_cards)
+        data, received = self._request(requests.get, self.URNs.get_list_cards)
         if received:
             for data_card in data:
                 result.append({
@@ -62,9 +64,11 @@ class Rosneft:
             return result, True
         return result, False
 
-    def get_list_limits_by_card(self, card_number: str) -> (list[dict], bool):
+    def get_list_limits_by_card(self, **kwargs) -> (list[dict], bool):
         result = []
-        data, received = self._request_get(self.URNs.get_limits_by_card, added_params={'card': card_number})
+        card_number = kwargs.get('card_number', '')
+        data, received = self._request(requests.get, self.URNs.get_limits_by_card,
+                                       added_params={'card': card_number})
         if received:
             for data_limit in data:
                 limit_type = self._name_limit_type(data_limit.get('GFlag', ''))
@@ -91,8 +95,6 @@ class Rosneft:
     def get_list_limits(self, list_cards: list) -> (list[dict], bool):
         result = []
         threads = self._threads(list_cards)
-        total_threads = len(threads)
-        print(f'    !!!Enabled threads = {total_threads}')
         for index in range(len(threads)):
             threads[index]['thread'] = Thread(target=self._get_list_limits_by_thread, args=(threads, index))
             threads[index]['thread'].start()
@@ -143,13 +145,38 @@ class Rosneft:
 
         return result, True
 
-    def _request_get(self, urn: str, added_params: dict = None) -> (any, bool):
+    def card_status_update(self, **kwargs) -> (dict, bool):
+        card_number = kwargs.get('card_number', '')
+        status_name = kwargs.get('status_name', '')
+        status_name_current = kwargs.get('status_name_current', '')
+        result = {'site_id': self.site.id, 'card_number': card_number, 'status_name': status_name_current}
+        match status_name:
+            case 'active':
+                data, received = self._request(requests.post, self.URNs.card_status_active, {'card': card_number})
+            case 'block':
+                data, received = self._request(requests.post, self.URNs.card_status_block, {'card': card_number})
+            case _:
+                return result, False
+
+        if received:
+            result.update(status_name=status_name)
+
+        return result, received
+
+    def _request(self, method: requests, urn: str, added_params: dict = None) -> (any, bool):
         url_request = f'{self.url}/{urn}'
         headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
         params = {'u': self.login, 'p': self.password, 'contract': self.contract_id, 'type': 'JSON'}
+
         if added_params:
             params = {**params, **added_params}
-        response = requests.get(url_request, headers=headers, json=json.dumps(params), params=params)
+
+        data = ''
+        for item in params:
+            if data:
+                data += '&'
+            data += ''.join([item, '=', params.get(item)])
+        response = method(url_request, headers=headers, json=json.dumps(params), params=params, data=data)
 
         if not response.status_code == 200:
             return response.text, False
@@ -166,7 +193,7 @@ class Rosneft:
             return
         result = []
         for card_number in data_request:
-            data, received = self.get_list_limits_by_card(card_number)
+            data, received = self.get_list_limits_by_card(card_number=card_number)
             if received:
                 result.append({'card': card_number, 'limits': data})
             else:
@@ -195,10 +222,12 @@ class Rosneft:
         card_number = kwargs.get('card_number', '')
         if card_number:
             added_params = {'begin': date_begin.isoformat(), 'end': date_end.isoformat(), 'card': card_number}
-            data, received = self._request_get(self.URNs.get_list_transactions_by_card, added_params=added_params)
+            data, received = self._request(requests.get, self.URNs.get_list_transactions_by_card,
+                                           added_params=added_params)
         else:
             added_params = {'begin': date_begin.isoformat(), 'end': date_end.isoformat()}
-            data, received = self._request_get(self.URNs.get_list_transactions, added_params=added_params)
+            data, received = self._request(requests.get, self.URNs.get_list_transactions_by_contract,
+                                           added_params=added_params)
         if received:
             list_data = data.get('OperationList', [])
 
@@ -386,6 +415,7 @@ class Rosneft:
             case 24:
                 result = 'return'
         return result
+
 
 class Tatneft:
     pass

@@ -16,9 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from cards.views import SiteBalanceAPIView
+from cards.views import *
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v2/site_balance/', SiteBalanceAPIView.as_view()),
+    path('api/v1/balance/', BalanceAPIView.as_view()),
+    path('api/v1/item/', ItemAPIView.as_view()),
+    path('api/v1/card/', CardAPIView.as_view()),
+    path('api/v1/card/status/', CardStatusAPIView.as_view()),
+    path('api/v1/transaction/', TransactionAPIView.as_view()),
+    path('api/v1/limit/', LimitAPIView.as_view())
 ]

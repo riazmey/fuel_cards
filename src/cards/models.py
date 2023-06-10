@@ -284,6 +284,7 @@ class Item(models.Model):
 
 class Limit(models.Model):
     id_external = models.CharField(max_length=128, default='', blank=False, verbose_name='ID (внешний)')
+    site = models.ForeignKey(Site, on_delete=models.PROTECT, db_index=True, blank=False, verbose_name='Сайт')
     card = models.ForeignKey(Card, on_delete=models.PROTECT, blank=False, db_index=True,
                              verbose_name='Топливная карта')
     type = models.ForeignKey(EnumLimitType, on_delete=models.PROTECT, blank=False, db_index=True,
@@ -319,6 +320,7 @@ class Limit(models.Model):
 
 
 class Transaction(models.Model):
+    site = models.ForeignKey(Site, on_delete=models.PROTECT, db_index=True, blank=False, verbose_name='Сайт')
     id_external = models.CharField(max_length=128, blank=False, verbose_name='ID (внешний)')
     type = models.ForeignKey(EnumTransactionType, on_delete=models.PROTECT, blank=False, verbose_name='Тип транзакции')
     date = models.DateTimeField(default=timezone.now, blank=False, verbose_name='Дата')
@@ -478,7 +480,7 @@ class BaseAPI:
         card_obj = self._get_card_obj(card_number)
         if not card_obj:
             return False, result
-        data, success = self.get_list_limits_by_card(card_number)
+        data, success = self.get_list_limits_by_card(card_number=card_number)
         if success:
             result = self._import_limits_by_card(card_obj, data)
         return result, success
@@ -545,23 +547,35 @@ class BaseAPI:
                     progress_bar(i + 1, total_items, prefix=text_prefix, length=50)
         return result, success
 
+    @transaction.atomic
+    def card_status_put(self, **kwargs) -> (Card or None, bool):
+        result = None
+        data, success = self.card_status_update(**kwargs)
+        if success:
+            card_number = data.get('card_number', '')
+            status_name = data.get('status_name', '')
+            status_obj = EnumCardStatus.objects.get(name=status_name)
+            defaults = {'status': status_obj}
+            result, created = Card.objects.update_or_create(site=self.site, number=card_number, defaults=defaults)
+        return result, success
+
     def _import_transaction(self, data_transaction: dict) -> list[dict]:
         result = []
         id_external = data_transaction.get('id_external', '')
-        type = data_transaction.get('type', '')
-        card = data_transaction.get('card', '')
+        type_name = data_transaction.get('type', '')
+        card_number = data_transaction.get('card', '')
         date = data_transaction.get('date', '')
         details = data_transaction.get('details', '')
         amount = data_transaction.get('amount', 0.00)
         discount = data_transaction.get('discount', 0.00)
         items = data_transaction.get('items', [])
 
-        type_obj = EnumTransactionType.objects.get(name=type)
-        card_obj = self._get_card_obj(card, True)
+        type_obj = EnumTransactionType.objects.get(name=type_name)
+        card_obj = self._get_card_obj(card_number, True)
         defaults = {'type': type_obj, 'date': date, 'details': details, 'amount': amount, 'discount': discount}
 
-        transaction_obj, created = Transaction.objects.update_or_create(card=card_obj, id_external=id_external,
-                                                                        defaults=defaults)
+        transaction_obj, created = Transaction.objects.update_or_create(site=self.site, card=card_obj,
+                                                                        id_external=id_external, defaults=defaults)
         imported_items = self._import_transaction_items(transaction_obj, items)
         result.append({'obj': transaction_obj, 'items': imported_items, 'created': created})
         return result
@@ -571,7 +585,7 @@ class BaseAPI:
         TransactionItem.objects.filter(transaction=transaction_obj).delete()
 
         for data_item in data_transaction_items:
-            item = data_item.get('item', '')
+            item_id_external = data_item.get('item', '')
             item_description = data_item.get('item_description', '')
             quantity = data_item.get('quantity', 0.00)
             price = data_item.get('price', 0.00)
@@ -579,7 +593,7 @@ class BaseAPI:
             amount = data_item.get('amount', 0.00)
             amount_with_discount = data_item.get('amount_with_discount', 0.00)
 
-            item_obj = self._get_item_obj(item)
+            item_obj = self._get_item_obj(item_id_external)
 
             defaults = {'item_description': item_description, 'quantity': quantity, 'price': price,
                         'price_with_discount': price_with_discount, 'amount': amount,
@@ -597,30 +611,31 @@ class BaseAPI:
 
         for data_limit in data_limits:
             id_external = data_limit.get('id_external', '')
-            type = data_limit.get('type', '')
-            category = data_limit.get('category', '')
-            item = data_limit.get('item', '')
+            type_name = data_limit.get('type', '')
+            category_name = data_limit.get('category', '')
+            item_id_external = data_limit.get('item', '')
             unit = data_limit.get('unit', '')
             period = data_limit.get('period', '')
             value = data_limit.get('value', 0.00)
             balance = data_limit.get('balance', 0.00)
 
-            type_obj = EnumLimitType.objects.get(name=type)
+            type_obj = EnumLimitType.objects.get(name=type_name)
             unit_obj = EnumUnit.objects.get(name=unit)
             period_obj = EnumLimitPeriod.objects.get(name=period)
             category_obj = None
             item_obj = None
 
-            match type:
+            match type_name:
                 case 'category':
-                    category_obj = EnumItemCategory.objects.get(name=category)
+                    category_obj = EnumItemCategory.objects.get(name=category_name)
                 case 'item':
-                    item_obj = Item.objects.get(site=self.site, id_external=item)
+                    item_obj = Item.objects.get(site=self.site, id_external=item_id_external)
 
             defaults = {'type': type_obj, 'category': category_obj, 'item': item_obj,
                         'unit': unit_obj, 'period': period_obj, 'value': value, 'balance': balance}
 
-            obj, created = Limit.objects.update_or_create(card=card_obj, id_external=id_external, defaults=defaults)
+            obj, created = Limit.objects.update_or_create(site=self.site, card=card_obj, id_external=id_external,
+                                                          defaults=defaults)
             result.append({'obj': obj, 'created': created})
 
         return result
@@ -653,7 +668,7 @@ class BaseAPI:
     def get_list_cards(self) -> (list[dict], bool):
         return [], False
 
-    def get_list_limits_by_card(self, card_number: str) -> (list[dict], bool):
+    def get_list_limits_by_card(self, **kwargs) -> (list[dict], bool):
         return [], False
 
     def get_list_limits(self, list_cards: list) -> (list[dict], bool):
@@ -662,13 +677,16 @@ class BaseAPI:
     def get_list_transactions(self, **kwargs) -> (list[dict], bool):
         return [], False
 
-    def set_limit_by_card(self, card_number: str, **data_limit) -> (dict, bool):
+    def card_status_update(self, **kwargs) -> (dict, bool):
         return {}, False
 
-    def del_limit_by_card(self, card_number: str, **data_limit) -> (dict, bool):
+    def limit_add(self, **kwargs) -> (dict, bool):
         return {}, False
 
-    def update_limit_by_card(self, card_number: str, **data_limit) -> (dict, bool):
+    def limit_update(self, **kwargs) -> (dict, bool):
+        return {}, False
+
+    def limit_delete(self, **kwargs) -> (dict, bool):
         return {}, False
 
 

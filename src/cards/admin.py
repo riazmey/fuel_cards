@@ -64,7 +64,7 @@ class ItemAdmin(admin.ModelAdmin):
 
 
 class TransactionAdmin(admin.ModelAdmin):
-    fields = [('type', 'id_external'), 'date', 'card', 'details', 'amount', 'discount']
+    fields = ['site', ('type', 'id_external'), 'date', 'card', 'details', 'amount', 'discount']
     list_display = ['type', 'date', 'card', 'id_external', 'amount', 'discount']
     list_filter = ['card', 'type']
     date_hierarchy = 'date'
