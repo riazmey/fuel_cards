@@ -171,12 +171,15 @@ class Rosneft:
         if added_params:
             params = {**params, **added_params}
 
-        data = ''
-        for item in params:
-            if data:
-                data += '&'
-            data += ''.join([item, '=', params.get(item)])
-        response = method(url_request, headers=headers, json=json.dumps(params), params=params, data=data)
+        if method == requests.get:
+            response = method(url_request, headers=headers, json=json.dumps(params), params=params)
+        else:
+            data = ''
+            for item in params:
+                if data:
+                    data += '&'
+                data += ''.join([item, '=', params.get(item)])
+            response = method(url_request, headers=headers, json=json.dumps(params), params=params, data=data)
 
         if not response.status_code == 200:
             return response.text, False
