@@ -94,7 +94,7 @@ class Rosneft:
 
     def get_list_limits(self, list_cards: list) -> (list[dict], bool):
         result = []
-        threads = self._threads(list_cards)
+        threads = self._threads(items=list_cards, ratio=4)
         for index in range(len(threads)):
             threads[index]['thread'] = Thread(target=self._get_list_limits_by_thread, args=(threads, index))
             threads[index]['thread'].start()
@@ -125,7 +125,7 @@ class Rosneft:
         if card_number:
             for period in periods:
                 period['card_number'] = card_number
-        threads = self._threads(periods)
+        threads = self._threads(items=periods)
 
         for index in range(len(threads)):
             threads[index]['thread'] = Thread(target=self._get_list_transactions_by_thread,
@@ -300,7 +300,7 @@ class Rosneft:
         return result
 
     @staticmethod
-    def _threads(items: list) -> list:
+    def _threads(items: list, ratio: int = 1) -> list:
         result = []
         total_threads = int(round(multiprocessing.cpu_count() * 0.8, 0))
         match multiprocessing.cpu_count():
@@ -312,6 +312,8 @@ class Rosneft:
                 total_threads = 2
             case 4:
                 total_threads = 3
+
+        total_threads = total_threads * ratio
 
         for i in range(total_threads):
             result.append({'thread': None, 'data_request': None, 'data_response': None, 'received': False})
