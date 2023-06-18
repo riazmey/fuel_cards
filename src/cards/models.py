@@ -526,7 +526,7 @@ class BaseAPI:
             total_items = len(data)
             for i in range(total_items):
                 data_transaction = data[i]
-                result += self._import_transaction(data_transaction)
+                result += self._import_transaction(**data_transaction)
                 if verbose:
                     text_prefix = f'Транзакции ({self.site}) {i}/{total_items}:'
                     progress_bar(i + 1, total_items, prefix=text_prefix, length=50)
@@ -541,7 +541,7 @@ class BaseAPI:
             total_items = len(data)
             for i in range(total_items):
                 data_transaction = data[i]
-                result += self._import_transaction(data_transaction)
+                result += self._import_transaction(**data_transaction)
                 if verbose:
                     text_prefix = f'Транзакции ({self.site}) {i}/{total_items}:'
                     progress_bar(i + 1, total_items, prefix=text_prefix, length=50)
@@ -559,19 +559,19 @@ class BaseAPI:
             result, created = Card.objects.update_or_create(site=self.site, number=card_number, defaults=defaults)
         return result, success
 
-    def _import_transaction(self, data_transaction: dict) -> list[dict]:
+    def _import_transaction(self, **kwargs) -> list[dict]:
         result = []
-        id_external = data_transaction.get('id_external', '')
-        type_name = data_transaction.get('type', '')
-        card_number = data_transaction.get('card', '')
-        date = data_transaction.get('date', '')
-        details = data_transaction.get('details', '')
-        amount = data_transaction.get('amount', 0.00)
-        discount = data_transaction.get('discount', 0.00)
-        items = data_transaction.get('items', [])
+        id_external = kwargs.get('id_external', '')
+        type_name = kwargs.get('type', '')
+        card_number = kwargs.get('card', '')
+        date = kwargs.get('date', '')
+        details = kwargs.get('details', '')
+        amount = kwargs.get('amount', 0.00)
+        discount = kwargs.get('discount', 0.00)
+        items = kwargs.get('items', [])
 
         type_obj = EnumTransactionType.objects.get(name=type_name)
-        card_obj = self._get_card_obj(card_number, True)
+        card_obj = self._get_card_obj(card_number, False)
         defaults = {'type': type_obj, 'date': date, 'details': details, 'amount': amount, 'discount': discount}
 
         transaction_obj, created = Transaction.objects.update_or_create(site=self.site, card=card_obj,

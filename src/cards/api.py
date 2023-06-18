@@ -90,11 +90,13 @@ class Rosneft:
                     'balance': data_limit.get('CurValue', 0.00)
                 })
             return result, True
+        else:
+            result.append(data)
         return result, False
 
     def get_list_limits(self, list_cards: list) -> (list[dict], bool):
         result = []
-        threads = self._threads(items=list_cards, ratio=4)
+        threads = self._threads(items=list_cards, ratio=5)
         for index in range(len(threads)):
             threads[index]['thread'] = Thread(target=self._get_list_limits_by_thread, args=(threads, index))
             threads[index]['thread'].start()
@@ -200,6 +202,7 @@ class Rosneft:
             if received:
                 result.append({'card': card_number, 'limits': data})
             else:
+                print(f'    ERROR._get_list_limits_by_thread.data ({card_number}) = {data}')
                 return
         threads[index]['data_response'] = result
         threads[index]['received'] = True
