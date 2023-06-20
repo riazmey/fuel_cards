@@ -7,13 +7,20 @@ from .serializers import *
 class BalanceAPIView(APIView):
 
     def get(self, request):
-        params = BalanceGetSerializerParams(data=request.query_params)
+        date = request.query_params.get('date', None)
+        if date:
+            params = BalanceGetByDateSerializerParams(data=request.query_params)
+        else:
+            params = BalanceGetSerializerParams(data=request.query_params)
         params.is_valid(raise_exception=True)
 
         site_id = params.data.get('site')
-        date = params.data.get('date')
 
-        queryset = SiteBalance.objects.filter(site=site_id, date__lte=date).order_by('-date')
+        if date:
+            queryset = SiteBalance.objects.filter(site=site_id, date__lte=date).order_by('-date')
+        else:
+            queryset = SiteBalance.objects.filter(site=site_id).order_by('-date')
+
         if queryset:
             data = queryset[0]
         else:

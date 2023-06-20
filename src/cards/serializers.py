@@ -172,6 +172,10 @@ class ItemsTransactionSerializer(serializers.Serializer):
 
 class BalanceGetSerializerParams(serializers.Serializer):
     site = serializers.IntegerField(validators=[validate_site])
+
+
+class BalanceGetByDateSerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
     date = serializers.DateField()
 
 
