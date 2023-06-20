@@ -38,8 +38,13 @@ class CardAPIView(APIView):
 
     def get(self, request):
         status_name = request.query_params.get('status', None)
-        if status_name:
+        card_number = request.query_params.get('card', None)
+        if status_name and card_number:
+            params = CardGetByStatusAndNumberSerializerParams(data=request.query_params)
+        elif status_name and not card_number:
             params = CardGetByStatusSerializerParams(data=request.query_params)
+        elif not status_name and card_number:
+            params = CardGetByNumberSerializerParams(data=request.query_params)
         else:
             params = CardGetSerializerParams(data=request.query_params)
         params.is_valid(raise_exception=True)
@@ -47,9 +52,14 @@ class CardAPIView(APIView):
         site_id = params.data.get('site')
         site_obj = Site.objects.get(id=site_id)
 
-        if status_name:
+        if status_name and card_number:
+            status_obj = EnumCardStatus.objects.get(name=status_name)
+            queryset = Card.objects.filter(site=site_obj, status=status_obj, number=card_number, relevant=True)
+        elif status_name and not card_number:
             status_obj = EnumCardStatus.objects.get(name=status_name)
             queryset = Card.objects.filter(site=site_obj, status=status_obj, relevant=True)
+        elif not status_name and card_number:
+            queryset = Card.objects.filter(site=site_obj, number=card_number, relevant=True)
         else:
             queryset = Card.objects.filter(site=site_obj, relevant=True)
 

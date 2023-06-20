@@ -110,10 +110,8 @@ class Rosneft:
             received = data_thread.get('received', False)
             data_response = data_thread.get('data_response', None)
             if received and isinstance(data_response, list):
-                print(f'        Thread {index}: true')
                 result += data_thread.get('data_response', [])
             else:
-                print(f'        Thread {index}: FALSE')
                 return result, False
 
         return result, True
@@ -240,10 +238,8 @@ class Rosneft:
 
         if received:
             result.update(request_id=data.get('RequestId', ''))
-            print(f'    limit_del.data = {data}')
         else:
             result = {**result, **data}
-        print(f'    limit_del.result = {result}')
         return result, received
 
     def _request(self, method: requests, urn: str, added_params: dict = None) -> (any, bool):
@@ -283,7 +279,6 @@ class Rosneft:
             if received:
                 result.append({'card': card_number, 'limits': data})
             else:
-                print(f'    ERROR._get_list_limits_by_thread.data ({card_number}) = {data}')
                 return
         threads[index]['data_response'] = result
         threads[index]['received'] = True

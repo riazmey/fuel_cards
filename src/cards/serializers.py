@@ -201,18 +201,52 @@ class CardGetSerializerParams(serializers.Serializer):
     site = serializers.IntegerField(validators=[validate_site])
 
 
+class CardGetByNumberSerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
+    card = serializers.CharField()
+
+    def validate(self, data):
+        validate_card(data)
+        return data
+
+
 class CardGetByStatusSerializerParams(serializers.Serializer):
     site = serializers.IntegerField(validators=[validate_site])
     status = serializers.CharField(validators=[validate_card_status])
 
 
+class CardGetByStatusAndNumberSerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
+    status = serializers.CharField(validators=[validate_card_status])
+    card = serializers.CharField()
+
+    def validate(self, data):
+        validate_card(data)
+        return data
+
+
+class LimitSerializerData(serializers.ModelSerializer):
+    site = SiteSerializer()
+    card = CardSerializer()
+    type = EnumLimitTypeSerializer()
+    category = EnumItemCategorySerializer()
+    item = ItemSerializer()
+    period = EnumLimitPeriodSerializer()
+    unit = EnumUnitSerializer()
+
+    class Meta:
+        model = Limit
+        fields = ('id_external', 'site', 'card', 'type', 'category', 'item', 'period', 'unit', 'value', 'balance')
+
+
 class CardSerializerData(serializers.ModelSerializer):
     site = SiteSerializer()
     status = EnumCardStatusSerializer()
+    limits = LimitSerializerData(many=True, source='limit_set')
 
     class Meta:
         model = Card
-        fields = ('id', 'site', 'number', 'status')
+        fields = ('id', 'site', 'number', 'status', 'limits')
 
 
 class CardStatusPutSerializerParams(serializers.Serializer):
@@ -335,19 +369,3 @@ class LimitDeleteSerializerParams(serializers.Serializer):
         validate_card(data)
         validate_limit_id_external(data)
         return data
-
-
-class LimitSerializerData(serializers.ModelSerializer):
-    site = SiteSerializer()
-    card = CardSerializer()
-    type = EnumLimitTypeSerializer()
-    category = EnumItemCategory()
-    item = ItemSerializer()
-    period = EnumLimitPeriodSerializer()
-    unit = EnumUnitSerializer()
-
-    class Meta:
-        model = Limit
-        fields = ('id_external', 'site', 'card', 'type', 'category', 'item', 'period', 'unit', 'value', 'balance')
-
-
