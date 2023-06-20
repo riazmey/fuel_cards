@@ -227,7 +227,7 @@ class Rosneft:
         value_current = kwargs.get('value_current', 0.00)
         value = kwargs.get('value', 0.00)
 
-        result = {'request_id': ''}
+        result = {'id_external': id_external, 'request_id': ''}
 
         added_params = {'Card': card_number, 'LimitCode': id_external, 'Val': value, 'CurValue': value_current,
                         'Prd': self._describe_prd(period_name), 'Currency': self._describe_currency(unit_name),
