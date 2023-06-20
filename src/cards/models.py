@@ -283,7 +283,7 @@ class Item(models.Model):
 
 
 class Limit(models.Model):
-    id_external = models.CharField(max_length=128, default='', blank=False, verbose_name='ID (внешний)')
+    id_external = models.CharField(max_length=128, db_index=True, blank=False, verbose_name='ID (внешний)')
     site = models.ForeignKey(Site, on_delete=models.PROTECT, db_index=True, blank=False, verbose_name='Сайт')
     card = models.ForeignKey(Card, on_delete=models.PROTECT, blank=False, db_index=True,
                              verbose_name='Топливная карта')
@@ -559,6 +559,132 @@ class BaseAPI:
             result, created = Card.objects.update_or_create(site=self.site, number=card_number, defaults=defaults)
         return result, success
 
+    @transaction.atomic
+    def limit_post(self, **kwargs) -> (Limit or None, bool):
+        result = None
+        data, success = self.limit_add(**kwargs)
+        if success:
+            id_external = data.get('id_external', '')
+            card_number = data.get('card_number', '')
+            type_name = data.get('type_name', '')
+            category_name = data.get('category_name', '')
+            item_id_external = data.get('item_id_external', '')
+            period_name = data.get('period_name', '')
+            unit_name = data.get('unit_name', '')
+            value = data.get('value', 0.00)
+
+            card_obj = self._get_card_obj(card_number)
+            type_obj = EnumLimitType.objects.get(name=type_name)
+            period_obj = EnumLimitPeriod.objects.get(name=period_name)
+            unit_obj = EnumUnit.objects.get(name=unit_name)
+
+            defaults = {'card': card_obj, 'type': type_obj, 'period': period_obj, 'unit': unit_obj,
+                        'value': value, 'category': None, 'item': None}
+
+            match type_name:
+                case 'category':
+                    category_obj = EnumItemCategory.objects.get(name=category_name)
+                    defaults['category'] = category_obj
+                case 'item':
+                    item_obj = Item.objects.get(site=self.site, id_external=item_id_external)
+                    defaults['item'] = item_obj
+
+            result, created = Limit.objects.update_or_create(site=self.site, card=card_obj, id_external=id_external,
+                                                             defaults=defaults)
+        return result, success
+
+    @transaction.atomic
+    def limit_put(self, **kwargs) -> (Limit or None, bool):
+        result = None
+
+        card_number = kwargs.get('card_number', '')
+        id_external = kwargs.get('id_external', '')
+
+        card_obj = Card.objects.get(site=self.site, number=card_number)
+        limit_obj = Limit.objects.get(site=self.site, card=card_obj, id_external=id_external)
+
+        kwargs.update(type_name=limit_obj.type.name)
+
+        if limit_obj.category:
+            kwargs.update(category_name=limit_obj.category.name)
+        else:
+            kwargs.update(category_name=None)
+
+        if limit_obj.item:
+            kwargs.update(item_id_external=limit_obj.item.id_external)
+        else:
+            kwargs.update(item_id_external='')
+
+        kwargs.update(period_name=limit_obj.period.name)
+        kwargs.update(unit_name=limit_obj.unit.name)
+        kwargs.update(value_current=limit_obj.value)
+
+        data, success = self.limit_update(**kwargs)
+        if success:
+            id_external = data.get('id_external', '')
+            card_number = data.get('card_number', '')
+            type_name = data.get('type_name', '')
+            category_name = data.get('category_name', '')
+            item_id_external = data.get('item_id_external', '')
+            period_name = data.get('period_name', '')
+            unit_name = data.get('unit_name', '')
+            value = data.get('value', 0.00)
+
+            card_obj = self._get_card_obj(card_number)
+            type_obj = EnumLimitType.objects.get(name=type_name)
+            period_obj = EnumLimitPeriod.objects.get(name=period_name)
+            unit_obj = EnumUnit.objects.get(name=unit_name)
+
+            defaults = {'card': card_obj, 'type': type_obj, 'period': period_obj, 'unit': unit_obj,
+                        'value': value, 'category': None, 'item': None}
+
+            match type_name:
+                case 'category':
+                    category_obj = EnumItemCategory.objects.get(name=category_name)
+                    defaults['category'] = category_obj
+                case 'item':
+                    item_obj = Item.objects.get(site=self.site, id_external=item_id_external)
+                    defaults['item'] = item_obj
+
+            result, created = Limit.objects.update_or_create(site=self.site, card=card_obj, id_external=id_external,
+                                                             defaults=defaults)
+        return result, success
+
+    @transaction.atomic
+    def limit_delete(self, **kwargs) -> (dict, bool):
+        card_number = kwargs.get('card_number', '')
+        id_external = kwargs.get('id_external', '')
+
+        card_obj = Card.objects.get(site=self.site, number=card_number)
+        limit_obj = Limit.objects.get(site=self.site, card=card_obj, id_external=id_external)
+
+        kwargs.update(type_name=limit_obj.type.name)
+
+        if limit_obj.category:
+            kwargs.update(category_name=limit_obj.category.name)
+        else:
+            kwargs.update(category_name=None)
+
+        if limit_obj.item:
+            kwargs.update(item_id_external=limit_obj.item.id_external)
+        else:
+            kwargs.update(item_id_external='')
+
+        kwargs.update(period_name=limit_obj.period.name)
+        kwargs.update(unit_name=limit_obj.unit.name)
+        kwargs.update(value_current=limit_obj.value)
+        kwargs.update(value=0.00)
+
+        data, success = self.limit_del(**kwargs)
+
+        if success:
+            card_obj = Card.objects.get(site=self.site, number=card_number)
+            try:
+                Limit.objects.get(site=self.site, card=card_obj, id_external=id_external).delete()
+            except:
+                success = False
+        return data, success
+
     def _import_transaction(self, **kwargs) -> list[dict]:
         result = []
         id_external = kwargs.get('id_external', '')
@@ -686,8 +812,8 @@ class BaseAPI:
     def limit_update(self, **kwargs) -> (dict, bool):
         return {}, False
 
-    def limit_delete(self, **kwargs) -> (dict, bool):
-        return {}, False
+    def limit_del(self, **kwargs) -> (dict, bool):
+        return False
 
 
 post_init.connect(Site.post_init, Site)

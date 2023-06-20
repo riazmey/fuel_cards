@@ -14,7 +14,39 @@ def validate_card_status(status_name: str):
     try:
         return EnumCardStatus.objects.get(name=status_name)
     except EnumCardStatus.DoesNotExist:
-        message = f'Статус топливной карты \'{status_name}\' не зарегистрирован в системе'
+        message = f'Статус топливной карты с именем \'{status_name}\' не зарегистрирован в системе'
+        raise serializers.ValidationError(message)
+
+
+def validate_enum_limit_type(type_name: str):
+    try:
+        return EnumLimitType.objects.get(name=type_name)
+    except EnumLimitType.DoesNotExist:
+        message = f'Тип лимита с именем \'{type_name}\' не зарегистрирован в системе'
+        raise serializers.ValidationError(message)
+
+
+def validate_enum_item_category(category_name: str):
+    try:
+        return EnumItemCategory.objects.get(name=category_name)
+    except EnumItemCategory.DoesNotExist:
+        message = f'Категория товара с именем \'{category_name}\' не зарегистрирована в системе'
+        raise serializers.ValidationError(message)
+
+
+def validate_enum_limit_period(period_name: str):
+    try:
+        return EnumLimitPeriod.objects.get(name=period_name)
+    except EnumLimitPeriod.DoesNotExist:
+        message = f'Тип периода лимита с именем \'{period_name}\' не зарегистрирован в системе'
+        raise serializers.ValidationError(message)
+
+
+def validate_enum_unit(unit_name: str):
+    try:
+        return EnumUnit.objects.get(name=unit_name)
+    except EnumUnit.DoesNotExist:
+        message = f'Единица измерения с именем \'{unit_name}\' не зарегистрирована в системе'
         raise serializers.ValidationError(message)
 
 
@@ -51,6 +83,30 @@ def validate_set_card_status_collision(data: dict):
     if status_obj.name == card_obj.status.name:
         message = f'Текущий статус топливной карты \'{card_obj}\' равен статусу к установке ({status_obj})'
         raise serializers.ValidationError({'status': message})
+
+
+def validate_item(data: dict):
+    site_id = data.get('site')
+    item_id_external = data.get('item')
+    site_obj = Site.objects.get(id=site_id)
+    try:
+        return Item.objects.get(site=site_obj, id_external=item_id_external)
+    except Item.DoesNotExist:
+        message = f'У сайта \'{site_obj}\' товар с внешним ID \'{item_id_external}\' отсутствует'
+        raise serializers.ValidationError(message)
+
+
+def validate_limit_id_external(data: dict):
+    site_id = data.get('site')
+    card_number = data.get('card')
+    limit_id_external = data.get('id_external')
+    site_obj = Site.objects.get(id=site_id)
+    card_obj = Card.objects.get(site=site_obj, number=card_number)
+    try:
+        return Limit.objects.get(site=site_obj, card=card_obj, id_external=limit_id_external)
+    except Limit.DoesNotExist:
+        message = f'У топливной карты \'{card_obj}\' отсутствует лимит с внешним ID \'{limit_id_external}\''
+        raise serializers.ValidationError(message)
 
 
 class SiteSerializer(serializers.Serializer):
@@ -216,6 +272,71 @@ class LimitGetByCardSerializerParams(serializers.Serializer):
         return data
 
 
+class LimitPostTypeCategorySerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
+    card = serializers.CharField()
+    type = serializers.CharField(validators=[validate_enum_limit_type])
+    category = serializers.CharField(validators=[validate_enum_item_category])
+    period = serializers.CharField(validators=[validate_enum_limit_period])
+    unit = serializers.CharField(validators=[validate_enum_unit])
+    value = serializers.FloatField()
+
+    def validate(self, data):
+        validate_card(data)
+        return data
+
+
+class LimitPostTypeItemSerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
+    card = serializers.CharField()
+    type = serializers.CharField(validators=[validate_enum_limit_type])
+    item = serializers.CharField()
+    period = serializers.CharField(validators=[validate_enum_limit_period])
+    unit = serializers.CharField(validators=[validate_enum_unit])
+    value = serializers.FloatField()
+
+    def validate(self, data):
+        validate_card(data)
+        validate_item(data)
+        return data
+
+
+class LimitPostTypeAllSerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
+    card = serializers.CharField()
+    type = serializers.CharField(validators=[validate_enum_limit_type])
+    period = serializers.CharField(validators=[validate_enum_limit_period])
+    unit = serializers.CharField(validators=[validate_enum_unit])
+    value = serializers.FloatField()
+
+    def validate(self, data):
+        validate_card(data)
+        return data
+
+
+class LimitPutSerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
+    card = serializers.CharField()
+    id_external = serializers.CharField()
+    value = serializers.FloatField()
+
+    def validate(self, data):
+        validate_card(data)
+        validate_limit_id_external(data)
+        return data
+
+
+class LimitDeleteSerializerParams(serializers.Serializer):
+    site = serializers.IntegerField(validators=[validate_site])
+    card = serializers.CharField()
+    id_external = serializers.CharField()
+
+    def validate(self, data):
+        validate_card(data)
+        validate_limit_id_external(data)
+        return data
+
+
 class LimitSerializerData(serializers.ModelSerializer):
     site = SiteSerializer()
     card = CardSerializer()
@@ -230,21 +351,3 @@ class LimitSerializerData(serializers.ModelSerializer):
         fields = ('id_external', 'site', 'card', 'type', 'category', 'item', 'period', 'unit', 'value', 'balance')
 
 
-'''
-class CardSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Card
-        fields = ('site_id', 'number', 'status', 'repr')
-        depth = 1
-'''
-
-'''
-class CardSerializer(serializers.Serializer):
-    site = SiteSerializer()
-    number = serializers.CharField()
-    status = EnumCardStatusSerializer()
-    repr = serializers.CharField()
-
-    def create(self, validated_data):
-        return Card.objects.create(**validated_data)
-'''

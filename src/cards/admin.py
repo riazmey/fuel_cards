@@ -36,7 +36,7 @@ class SiteBalanceAdmin(admin.ModelAdmin):
     list_display = ['site', 'date', 'available']
     list_filter = ['site__type']
     date_hierarchy = 'date'
-    ordering = ['site', 'date']
+    ordering = ['site', '-date']
 
 
 class CardAdmin(admin.ModelAdmin):
@@ -69,7 +69,7 @@ class TransactionAdmin(admin.ModelAdmin):
     list_filter = ['card', 'type']
     date_hierarchy = 'date'
     search_fields = ['card__repr', 'id_external']
-    ordering = ['date', 'card']
+    ordering = ['-date', 'card']
     save_as = True
 
 

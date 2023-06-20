@@ -1,5 +1,6 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import status
 from .serializers import *
 
 
@@ -18,20 +19,6 @@ class BalanceAPIView(APIView):
         else:
             data = SiteBalance(site=Site.objects.get(id=site_id), date=date)
         return Response(BalanceSerializerData(data).data)
-
-    #def post(self, request):
-    #    serializer = SiteBalanceSerializerParams(data=request.data)
-    #    serializer.is_valid(raise_exception=True)
-    #    serializer.save()
-    #
-    #    return Response(serializer.data)
-
-    #queryset = SiteBalance.objects.filter(date__lte=timezone.now())
-    #serializer_class = SiteBalanceSerializer
-
-#class SiteBalanceAPIView(APIView):
-#    queryset = SiteBalance.objects.filter(date__lte=timezone.now())
-#    serializer_class = SiteBalanceSerializer
 
 
 class ItemAPIView(APIView):
@@ -93,7 +80,7 @@ class CardStatusAPIView(APIView):
         if success:
             return Response(CardSerializerData(data).data)
         else:
-            return Response({})
+            return Response({}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class TransactionAPIView(APIView):
@@ -146,10 +133,65 @@ class LimitAPIView(APIView):
             return Response([])
 
     def post(self, request):
-        pass
+        type_name = request.query_params.get('type', '')
+        match type_name:
+            case 'category':
+                params = LimitPostTypeCategorySerializerParams(data=request.query_params)
+            case 'item':
+                params = LimitPostTypeItemSerializerParams(data=request.query_params)
+            case _:
+                params = LimitPostTypeAllSerializerParams(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        site_id = params.data.get('site')
+        card_number = params.data.get('card')
+        category_name = params.data.get('category', '')
+        item_id_external = params.data.get('item', '')
+        period_name = params.data.get('period')
+        unit_name = params.data.get('unit')
+        value = float(params.data.get('value'))
+
+        site_obj = Site.objects.get(id=site_id)
+
+        data, success = site_obj.api.limit_post(card_number=card_number, type_name=type_name,
+                                                category_name=category_name, item_id_external=item_id_external,
+                                                period_name=period_name, unit_name=unit_name, value=value)
+
+        if success:
+            return Response(LimitSerializerData(data).data)
+        else:
+            return Response({}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request):
-        pass
+        params = LimitPutSerializerParams(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        site_id = params.data.get('site')
+        card_number = params.data.get('card')
+        id_external = params.data.get('id_external')
+        value = float(params.data.get('value'))
+
+        site_obj = Site.objects.get(id=site_id)
+        data, success = site_obj.api.limit_put(card_number=card_number, id_external=id_external, value=value)
+
+        if success:
+            return Response(LimitSerializerData(data).data)
+        else:
+            return Response({}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
-        pass
+        params = LimitDeleteSerializerParams(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        site_id = params.data.get('site')
+        card_number = params.data.get('card')
+        id_external = params.data.get('id_external')
+
+        site_obj = Site.objects.get(id=site_id)
+        data, success = site_obj.api.limit_delete(card_number=card_number, id_external=id_external)
+
+        if success:
+            status_code = status.HTTP_200_OK
+        else:
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return Response(data, status_code)

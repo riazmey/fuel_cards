@@ -165,6 +165,87 @@ class Rosneft:
 
         return result, received
 
+    def limit_add(self, **kwargs) -> (dict, bool):
+        card_number = kwargs.get('card_number', '')
+        type_name = kwargs.get('type_name', '')
+        category_name = kwargs.get('category_name', '')
+        item_id_external = kwargs.get('item_id_external', '')
+        period_name = kwargs.get('period_name', '')
+        unit_name = kwargs.get('unit_name', '')
+        value = kwargs.get('value', 0.00)
+
+        result = {'id_external': '', 'card_number': card_number, 'type_name': type_name,
+                  'category_name': category_name, 'item_id_external': item_id_external, 'period_name': period_name,
+                  'unit_name': unit_name, 'value': value}
+
+        added_params = {'Card': card_number, 'GCode': self._describe_gcode(type_name, category_name, item_id_external),
+                        'GFlag': self._describe_gflag(type_name), 'Prd': self._describe_prd(period_name),
+                        'Currency': self._describe_currency(unit_name), 'Val': value, 'request_id': ''}
+
+        data, received = self._request(requests.post, self.URNs.limit_add, added_params)
+
+        if received:
+            result.update(id_external=data.get('LimitCode', ''))
+            result.update(request_id=data.get('RequestId', ''))
+
+        return result, received
+
+    def limit_update(self, **kwargs) -> (dict, bool):
+        id_external = kwargs.get('id_external', '')
+        card_number = kwargs.get('card_number', '')
+        type_name = kwargs.get('type_name', '')
+        category_name = kwargs.get('category_name', '')
+        item_id_external = kwargs.get('item_id_external', '')
+        period_name = kwargs.get('period_name', '')
+        unit_name = kwargs.get('unit_name', '')
+        value_current = kwargs.get('value_current', 0.00)
+        value = kwargs.get('value', 0.00)
+
+        result = {'id_external': id_external, 'card_number': card_number, 'type_name': type_name,
+                  'category_name': category_name, 'item_id_external': item_id_external, 'period_name': period_name,
+                  'unit_name': unit_name, 'value': value, 'request_id': ''}
+
+        added_params = {'Card': card_number, 'LimitCode': id_external, 'Val': value, 'CurValue': value_current,
+                        'Prd': self._describe_prd(period_name), 'Currency': self._describe_currency(unit_name),
+                        'GCode': self._describe_gcode(type_name, category_name, item_id_external),
+                        'GFlag': self._describe_gflag(type_name)}
+
+        data, received = self._request(requests.post, self.URNs.limit_update, added_params)
+
+        if received:
+            result.update(id_external=data.get('LimitCode', ''))
+            result.update(request_id=data.get('RequestId', ''))
+
+        return result, received
+
+    def limit_del(self, **kwargs) -> (dict, bool):
+        id_external = kwargs.get('id_external', '')
+        card_number = kwargs.get('card_number', '')
+        type_name = kwargs.get('type_name', '')
+        category_name = kwargs.get('category_name', '')
+        item_id_external = kwargs.get('item_id_external', '')
+        period_name = kwargs.get('period_name', '')
+        unit_name = kwargs.get('unit_name', '')
+        value_current = kwargs.get('value_current', 0.00)
+        value = kwargs.get('value', 0.00)
+
+        result = {'request_id': ''}
+
+        added_params = {'Card': card_number, 'LimitCode': id_external, 'Val': value, 'CurValue': value_current,
+                        'Prd': self._describe_prd(period_name), 'Currency': self._describe_currency(unit_name),
+                        'GCode': self._describe_gcode(type_name, category_name, item_id_external),
+                        'GFlag': self._describe_gflag(type_name)}
+
+        data, received = self._request(requests.post, self.URNs.limit_delete, added_params)
+
+        if received:
+            result.update(request_id=data.get('RequestId', ''))
+            print(f'    limit_del.data = {data}')
+        else:
+            result = {**result, **data}
+        print(f'    limit_del.result = {result}')
+        return result, received
+
     def _request(self, method: requests, urn: str, added_params: dict = None) -> (any, bool):
         url_request = f'{self.url}/{urn}'
         headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
@@ -180,7 +261,7 @@ class Rosneft:
             for item in params:
                 if data:
                     data += '&'
-                data += ''.join([item, '=', params.get(item)])
+                data += ''.join([item, '=', str(params.get(item))])
             response = method(url_request, headers=headers, json=json.dumps(params), params=params, data=data)
 
         if not response.status_code == 200:
@@ -422,6 +503,47 @@ class Rosneft:
                 result = 'sale'
             case 24:
                 result = 'return'
+        return result
+
+    @staticmethod
+    def _describe_gcode(type_name: str, category_name: str, item_id_external: str) -> str:
+        result = ''
+        match type_name:
+            case 'category':
+                result = category_name.upper()
+            case 'item':
+                result = item_id_external
+        return result
+
+    @staticmethod
+    def _describe_gflag(type_name: str) -> str:
+        result = 'A'
+        match type_name:
+            case 'category':
+                result = 'C'
+            case 'item':
+                result = 'G'
+        return result
+
+    @staticmethod
+    def _describe_prd(period_name: str) -> str:
+        result = 'nonrenewable'
+        match period_name:
+            case 'day':
+                result = 'F'
+            case 'week':
+                result = 'F7'
+            case 'month':
+                result = 'M'
+        return result
+
+    @staticmethod
+    def _describe_currency(unit_name: str) -> str:
+        match unit_name:
+            case 'rub':
+                result = 'C'
+            case _:
+                result = 'V'
         return result
 
 
