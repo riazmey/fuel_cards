@@ -621,33 +621,9 @@ class BaseAPI:
 
         data, success = self.limit_update(**kwargs)
         if success:
-            id_external = data.get('id_external', '')
-            card_number = data.get('card_number', '')
-            type_name = data.get('type_name', '')
-            category_name = data.get('category_name', '')
-            item_id_external = data.get('item_id_external', '')
-            period_name = data.get('period_name', '')
-            unit_name = data.get('unit_name', '')
-            value = data.get('value', 0.00)
+            self.site.api.import_limits_by_card(card_number=card_number)
+            result = Limit.objects.get(site=self.site, card=card_obj, id_external=id_external)
 
-            card_obj = self._get_card_obj(card_number)
-            type_obj = EnumLimitType.objects.get(name=type_name)
-            period_obj = EnumLimitPeriod.objects.get(name=period_name)
-            unit_obj = EnumUnit.objects.get(name=unit_name)
-
-            defaults = {'card': card_obj, 'type': type_obj, 'period': period_obj, 'unit': unit_obj,
-                        'value': value, 'category': None, 'item': None}
-
-            match type_name:
-                case 'category':
-                    category_obj = EnumItemCategory.objects.get(name=category_name)
-                    defaults['category'] = category_obj
-                case 'item':
-                    item_obj = Item.objects.get(site=self.site, id_external=item_id_external)
-                    defaults['item'] = item_obj
-
-            result, created = Limit.objects.update_or_create(site=self.site, card=card_obj, id_external=id_external,
-                                                             defaults=defaults)
         return result, success
 
     @transaction.atomic
