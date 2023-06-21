@@ -522,7 +522,7 @@ class Rosneft:
 
     @staticmethod
     def _describe_prd(period_name: str) -> str:
-        result = 'nonrenewable'
+        result = 'N'
         match period_name:
             case 'day':
                 result = 'F'

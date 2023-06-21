@@ -150,7 +150,7 @@ class LimitAPIView(APIView):
             return Response([])
 
     def post(self, request):
-        type_name = request.query_params.get('type', '')
+        type_name = request.query_params.get('type', '').lower()
         match type_name:
             case 'category':
                 params = LimitPostTypeCategorySerializerParams(data=request.query_params)
@@ -162,10 +162,10 @@ class LimitAPIView(APIView):
 
         site_id = params.data.get('site')
         card_number = params.data.get('card')
-        category_name = params.data.get('category', '')
-        item_id_external = params.data.get('item', '')
-        period_name = params.data.get('period')
-        unit_name = params.data.get('unit')
+        category_name = params.data.get('category', '').lower()
+        item_id_external = params.data.get('item', '').lower()
+        period_name = params.data.get('period').lower()
+        unit_name = params.data.get('unit').lower()
         value = float(params.data.get('value'))
 
         site_obj = Site.objects.get(id=site_id)

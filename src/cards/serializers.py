@@ -20,7 +20,7 @@ def validate_card_status(status_name: str):
 
 def validate_enum_limit_type(type_name: str):
     try:
-        return EnumLimitType.objects.get(name=type_name)
+        return EnumLimitType.objects.get(name=type_name.lower())
     except EnumLimitType.DoesNotExist:
         message = f'Тип лимита с именем \'{type_name}\' не зарегистрирован в системе'
         raise serializers.ValidationError(message)
@@ -28,7 +28,7 @@ def validate_enum_limit_type(type_name: str):
 
 def validate_enum_item_category(category_name: str):
     try:
-        return EnumItemCategory.objects.get(name=category_name)
+        return EnumItemCategory.objects.get(name=category_name.lower())
     except EnumItemCategory.DoesNotExist:
         message = f'Категория товара с именем \'{category_name}\' не зарегистрирована в системе'
         raise serializers.ValidationError(message)
@@ -36,7 +36,7 @@ def validate_enum_item_category(category_name: str):
 
 def validate_enum_limit_period(period_name: str):
     try:
-        return EnumLimitPeriod.objects.get(name=period_name)
+        return EnumLimitPeriod.objects.get(name=period_name.lower())
     except EnumLimitPeriod.DoesNotExist:
         message = f'Тип периода лимита с именем \'{period_name}\' не зарегистрирован в системе'
         raise serializers.ValidationError(message)
@@ -44,7 +44,7 @@ def validate_enum_limit_period(period_name: str):
 
 def validate_enum_unit(unit_name: str):
     try:
-        return EnumUnit.objects.get(name=unit_name)
+        return EnumUnit.objects.get(name=unit_name.lower())
     except EnumUnit.DoesNotExist:
         message = f'Единица измерения с именем \'{unit_name}\' не зарегистрирована в системе'
         raise serializers.ValidationError(message)
