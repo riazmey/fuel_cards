@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from cards.views import *
+from fuel_cards.views import *
 
 
 urlpatterns = [
