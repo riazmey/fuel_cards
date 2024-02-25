@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED 1
 
 RUN apt-get update -y
 RUN apt-get upgrade -y
-RUN apt-get install -y mc nano
+RUN apt-get install -y mc nano apt-utils
 
 WORKDIR /app
 
