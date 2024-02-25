@@ -26,7 +26,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./src/cards/migrations:/app/src/cards/migrations/
+      - ./src/cards/migrations:/app/src/fuel_cards/migrations/
     command: "python ./src/manage.py runserver 0.0.0.0:8000"
     depends_on:
       - redis
