@@ -20,9 +20,9 @@ REDIS_HOST = 'redis'  # имя хоста Redis - имя контейнера Do
 REDIS_PORT = '6379'
 
 # CELERY settings
-# celery -A kubis_fuel worker -l info
-# celery -A kubis_fuel beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-# celery -A kubis_fuel beat -l info
+# celery -A fuel_cards worker -l info
+# celery -A fuel_cards beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+# celery -A fuel_cards beat -l info
 CELERY_BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60

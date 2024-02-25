@@ -3,7 +3,7 @@ import os
 import importlib
 import datetime
 
-from cards.models import *
+from fuel_cards.models import *
 from django.db import transaction
 
 from maintenance.data import *

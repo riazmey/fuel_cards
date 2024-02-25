@@ -17,9 +17,9 @@ class Petrolplus:
 
 class Rosneft:
     class URNs:
-        get_balance = '/api/emv/v1/ContractBalance'
+        get_balance = '/api/emv/v1/GetContractBalance'
         get_list_goods = '/api/emv/v1/GetGoodsList'
-        get_limits_by_card = '/api/emv/v1/GetCardLimits'
+        get_limits_by_card = '/api/emv/v2/GetCardLimits'
         get_list_cards = '/api/emv/v1/GetCardsByContract'
         get_list_transactions_by_card = '/api/emv/v2/GetOperByCard'
         get_list_transactions_by_contract = '/api/emv/v2/GetOperByContract'

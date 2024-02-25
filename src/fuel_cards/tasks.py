@@ -1,6 +1,6 @@
 from celery import shared_task
 
-from cards.models import *
+from fuel_cards.models import *
 from django.utils import timezone
 from django.template.context_processors import debug
 

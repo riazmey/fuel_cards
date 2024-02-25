@@ -1,4 +1,4 @@
-POSTGRES_DB='kubis_fuel'
+POSTGRES_DB='fuel_cards'
 POSTGRES_USER='postgres'
 POSTGRES_PASSWORD='Qwerty1212'
 

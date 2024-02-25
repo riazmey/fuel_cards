@@ -3,23 +3,23 @@ version: '3.3'
 services:
 
   redis:
-    container_name: kubis-fuel_redis
+    container_name: fuel_cards-redis
     restart: always
     image: redis:alpine
 
   postgres:
-    container_name: kubis-fuel_postgres
+    container_name: fuel_cards-postgres
     restart: always
     image: postgres
     env_file:
-      - ./src/kubis_fuel/settings/pg_credential.py
+      - ./src/fuel_cards/settings/pg_credential.py
     ports:
       - "5432:5432"
     volumes:
       - ./pg_data:/var/lib/postgresql/data/
 
   django:
-    container_name: kubis-fuel_django
+    container_name: fuel_cards-django
     restart: always
     build:
       context: ./
@@ -33,24 +33,24 @@ services:
       - postgres
 
   celery-worker:
-    container_name: kubis-fuel_celery-worker
+    container_name: fuel_cards-celery_worker
     restart: always
     build:
       context: ./
     environment:
       - DEBUG=1
-    command: "celery --workdir=./src -A kubis_fuel worker -l info"
+    command: "celery --workdir=./src -A fuel_cards worker -l info"
     depends_on:
       - redis
       - django
       - postgres
 
   celery-beat:
-    container_name: kubis-fuel_celery-beat
+    container_name: fuel_cards-celery_beat
     restart: always
     build:
       context: ./
-    command: "celery --workdir=./src -A kubis_fuel beat --scheduler django_celery_beat.schedulers:DatabaseScheduler -l info"
+    command: "celery --workdir=./src -A fuel_cards beat --scheduler django_celery_beat.schedulers:DatabaseScheduler -l info"
     environment:
       - DEBUG=1
     depends_on:
