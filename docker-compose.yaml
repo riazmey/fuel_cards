@@ -12,7 +12,7 @@ services:
     restart: always
     image: postgres
     env_file:
-      - ./src/fuel_cards/settings/pg_credential.py
+      - ./src/service/settings/pg_credential.py
     ports:
       - "5432:5432"
     volumes:
@@ -26,7 +26,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./src/cards/migrations:/app/src/fuel_cards/migrations/
+      - ./src/service/migrations:/app/src/service/migrations/
     command: "python ./src/manage.py runserver 0.0.0.0:8000"
     depends_on:
       - redis
