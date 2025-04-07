@@ -1,11 +1,15 @@
-FROM alpine:latest
+FROM python:3-11.bookworm
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-RUN apt-get update -y
-RUN apt-get upgrade -y
-RUN apt-get install -y git python3 python3-pip mc nano apt-utils
+RUN set -eux; \
+  apt-get update -y; \
+  apt-get upgrade -y; \
+  apt-get install -y \
+    git \
+    nano \
+  ;
 
 WORKDIR /app
 RUN git clone --branch master https://github.com/riazmey/fuel_cards.git
